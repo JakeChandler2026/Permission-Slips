@@ -1,9 +1,7 @@
 node_modules/
+.git/
 .env
 .env.*
-!app-config.example.js
 *.log
-.vercel/
+server*.log
 supabase/.temp/
-
-.vercel
