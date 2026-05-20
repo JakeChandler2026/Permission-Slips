@@ -1,0 +1,23 @@
+{
+  "name": "permission-slips",
+  "version": "1.0.0",
+  "description": "Reusable church activity paperwork submission portal.",
+  "main": "app.js",
+  "scripts": {
+    "check:js": "node --check app.js && node --check supabase-runtime.js",
+    "serve": "npx http-server . -p 4173 -c-1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.7.284"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

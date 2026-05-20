@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Activity Permission Slips</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Church Activity Paperwork</p>
+      <h1>Permission Slip Portal</h1>
+    </div>
+    <nav class="tabs" aria-label="Primary">
+      <button class="tab active" data-view="familyView" type="button">Family form</button>
+      <button class="tab" data-view="adminView" type="button">Admin</button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="runtime-banner" id="runtimeBanner"></div>
+
+    <section id="familyView" class="view active">
+      <div class="split">
+        <form id="submissionForm" class="panel form-panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Submit Packet</p>
+              <h2 id="activityTitle">Activity paperwork</h2>
+            </div>
+            <select id="activitySelect" aria-label="Activity"></select>
+          </div>
+
+          <fieldset>
+            <legend>Youth</legend>
+            <div class="grid two">
+              <label>Participant name<input name="participantName" required autocomplete="name"></label>
+              <label>Date of birth<input name="dateOfBirth" type="date" required></label>
+              <label>Age<input name="age" inputmode="numeric"></label>
+              <label>Gender<input name="gender" placeholder="M/F or preferred"></label>
+              <label>Phone<input name="phone" type="tel" autocomplete="tel"></label>
+              <label>Ward<input name="ward"></label>
+            </div>
+            <label>Address<input name="address" autocomplete="street-address"></label>
+            <div class="grid two">
+              <label>City<input name="city" autocomplete="address-level2"></label>
+              <label>State<input name="state" autocomplete="address-level1"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Parent or guardian</legend>
+            <div class="grid two">
+              <label>Parent/guardian name<input name="parentName" required autocomplete="name"></label>
+              <label>Primary phone<input name="primaryPhone" type="tel" required autocomplete="tel"></label>
+              <label>Secondary phone<input name="secondaryPhone" type="tel"></label>
+              <label>Email<input name="parentEmail" type="email" required autocomplete="email"></label>
+              <label>Father/guardian<input name="fatherName"></label>
+              <label>Father cell<input name="fatherCell" type="tel"></label>
+              <label>Mother/guardian<input name="motherName"></label>
+              <label>Mother cell<input name="motherCell" type="tel"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Emergency and insurance</legend>
+            <div class="grid two">
+              <label>Emergency contact<input name="emergencyContact" required></label>
+              <label>Emergency contact phone<input name="emergencyPhone" type="tel" required></label>
+              <label>Health insurance company<input name="insuranceCompany"></label>
+              <label>Policy number<input name="policyNumber"></label>
+              <label>Physician name<input name="physicianName"></label>
+              <label>Physician phone<input name="physicianPhone" type="tel"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Medical details</legend>
+            <div class="check-grid">
+              <label><input type="checkbox" name="specialDiet"> Special diet</label>
+              <label><input type="checkbox" name="allergies"> Allergies</label>
+              <label><input type="checkbox" name="selfAdmin"> Self-administers medication</label>
+              <label><input type="checkbox" name="surgery"> Recent surgery</label>
+              <label><input type="checkbox" name="chronicIllness"> Chronic illness</label>
+              <label><input type="checkbox" name="asthma"> Asthma</label>
+              <label><input type="checkbox" name="diabetes"> Diabetes</label>
+              <label><input type="checkbox" name="epilepsy"> Epilepsy</label>
+              <label><input type="checkbox" name="heartTrouble"> Heart trouble</label>
+              <label><input type="checkbox" name="highBp"> High BP</label>
+            </div>
+            <label>Diet explanation<textarea name="dietExplanation"></textarea></label>
+            <label>Allergy explanation<textarea name="allergyExplanation"></textarea></label>
+            <label>Medications<textarea name="medications"></textarea></label>
+            <label>Special needs or limitations<textarea name="specialNeeds"></textarea></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Medicine permissions</legend>
+            <div class="check-grid">
+              <label><input type="checkbox" name="acetaminophen"> Acetaminophen</label>
+              <label><input type="checkbox" name="antacid"> Antacid</label>
+              <label><input type="checkbox" name="ibuprofen"> Ibuprofen</label>
+              <label><input type="checkbox" name="diphenhydramine"> Diphenhydramine</label>
+              <label><input type="checkbox" name="otherMedicine"> Other medicine</label>
+            </div>
+            <label>Other medicine list<input name="otherMedicineList"></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Signature</legend>
+            <div class="signature-wrap">
+              <canvas id="signaturePad" width="760" height="220" aria-label="Signature pad"></canvas>
+              <button class="ghost" id="clearSignature" type="button">Clear signature</button>
+            </div>
+            <label class="consent"><input type="checkbox" name="consent" required> I certify this information is accurate and I am authorized to sign this paperwork.</label>
+          </fieldset>
+
+          <div class="actions">
+            <button type="button" class="secondary" id="previewPdf">Preview signed PDF</button>
+            <button type="submit">Submit signed copy</button>
+          </div>
+          <p class="form-status" id="formStatus" role="status"></p>
+        </form>
+
+        <aside class="panel pdf-panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Packet Preview</p>
+              <h2>Source PDF</h2>
+            </div>
+            <a id="pdfDownload" class="link-button" href="assets/2026-trek-paperwork-packet.pdf" target="_blank" rel="noreferrer">Open PDF</a>
+          </div>
+          <div id="pdfViewer" class="pdf-viewer" aria-label="Activity paperwork PDF preview"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="adminView" class="view">
+      <div class="admin-grid">
+        <form id="adminLogin" class="panel">
+          <p class="eyebrow">Admin Access</p>
+          <h2>Sign in</h2>
+          <label>Email<input name="email" type="email" autocomplete="email"></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password"></label>
+          <div class="actions">
+            <button type="submit">Sign in</button>
+            <button id="adminSignOut" class="secondary" type="button">Sign out</button>
+          </div>
+          <p id="adminStatus" class="form-status"></p>
+        </form>
+
+        <form id="activityForm" class="panel">
+          <p class="eyebrow">Reusable Defaults</p>
+          <h2>Activity setup</h2>
+          <div class="grid two">
+            <label>Activity name<input name="name" required></label>
+            <label>Slug<input name="slug" required></label>
+            <label>Dates<input name="dates"></label>
+            <label>Stake<input name="stake"></label>
+            <label>Leader<input name="leaderName"></label>
+            <label>Leader phone<input name="leaderPhone"></label>
+          </div>
+          <label>Leader email<input name="leaderEmail" type="email"></label>
+          <label>Description<textarea name="description"></textarea></label>
+          <div class="actions">
+            <button type="submit">Save activity</button>
+          </div>
+        </form>
+      </div>
+
+      <section class="panel dashboard">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Tracking</p>
+            <h2>Submissions</h2>
+          </div>
+          <div class="toolbar">
+            <input id="submissionSearch" placeholder="Search youth, parent, ward">
+            <button class="secondary" id="refreshAdmin" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="summaryCards" class="summary-grid"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Youth</th>
+                <th>Activity</th>
+                <th>Ward</th>
+                <th>Parent</th>
+                <th>Submitted</th>
+                <th>PDF</th>
+              </tr>
+            </thead>
+            <tbody id="submissionRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="app-config.js"></script>
+  <script type="module">
+    import * as pdfjsLib from "./assets/pdf.min.mjs";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "./assets/pdf.worker.min.mjs";
+    window.pdfjsLib = pdfjsLib;
+    window.dispatchEvent(new Event("pdfjs-ready"));
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="supabase-runtime.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
