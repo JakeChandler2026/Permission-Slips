@@ -81,7 +81,6 @@ const checkboxMap = {
 };
 
 const elements = {
-  runtimeBanner: document.getElementById("runtimeBanner"),
   tabs: document.querySelectorAll(".tab"),
   views: document.querySelectorAll(".view"),
   submissionForm: document.getElementById("submissionForm"),
@@ -268,12 +267,6 @@ function fromSubmissionRow(row) {
     pdfUrl: row.pdf_url || "",
     data: row.form_data || {}
   };
-}
-
-function renderRuntime() {
-  const mode = runtime.runtimeMode === "supabase" ? "Supabase mode" : "Demo local mode";
-  const message = runtime.statusMessage.replace(new RegExp(`^${mode}\\.\\s*`, "i"), "");
-  elements.runtimeBanner.innerHTML = `<strong>${mode}</strong> ${message}`;
 }
 
 function renderActivities() {
@@ -1005,7 +998,6 @@ function bindEvents() {
 }
 
 async function init() {
-  renderRuntime();
   setupSignaturePad();
   bindEvents();
 
