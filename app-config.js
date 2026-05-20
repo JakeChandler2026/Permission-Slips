@@ -5,7 +5,8 @@ window.PermissionSlipConfig = {
   supabase: {
     url: "https://sfdqctljsozhnsokevgh.supabase.co",
     anonKey: "sb_publishable_U94rNsPXd6gI82upBT3xPw_Vf01lOYW",
-    submissionsBucket: "permission-slip-submissions"
+    submissionsBucket: "permission-slip-submissions",
+    templatesBucket: "permission-slip-templates"
   },
   defaultActivity: {
     slug: "2026-trek",
@@ -17,7 +18,9 @@ window.PermissionSlipConfig = {
     leaderName: "",
     leaderPhone: "",
     leaderEmail: "",
-    ward: ""
+    ward: "",
+    pdfTemplateUrl: "assets/2026-trek-paperwork-packet.pdf",
+    defaultValues: {}
   }
 };
 

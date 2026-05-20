@@ -97,7 +97,10 @@ const elements = {
   adminSignOut: document.getElementById("adminSignOut"),
   adminStatus: document.getElementById("adminStatus"),
   activityForm: document.getElementById("activityForm"),
+  newActivity: document.getElementById("newActivity"),
+  activityCards: document.getElementById("activityCards"),
   submissionSearch: document.getElementById("submissionSearch"),
+  activityFilter: document.getElementById("activityFilter"),
   refreshAdmin: document.getElementById("refreshAdmin"),
   summaryCards: document.getElementById("summaryCards"),
   submissionRows: document.getElementById("submissionRows")
@@ -162,6 +165,28 @@ function getClient() {
   return runtime.createClient();
 }
 
+function getTemplateBucket() {
+  return config.supabase.templatesBucket || "permission-slip-templates";
+}
+
+function getActivityPdfUrl(activity) {
+  if (activity?.pdfTemplateUrl) return activity.pdfTemplateUrl;
+  if (activity?.pdfTemplatePath && runtime.canBootSupabase) {
+    const { data } = getClient().storage.from(getTemplateBucket()).getPublicUrl(activity.pdfTemplatePath);
+    return data.publicUrl;
+  }
+  return config.pdfTemplateUrl;
+}
+
+function getActivityDefaults(activity) {
+  return {
+    ward: activity?.ward || "",
+    city: activity?.defaultValues?.city || "",
+    state: activity?.defaultValues?.state || "",
+    ...activity?.defaultValues
+  };
+}
+
 async function loadActivities() {
   const fallbackActivities = [{ id: "default-activity", ...config.defaultActivity }];
   if (!runtime.canBootSupabase) {
@@ -217,7 +242,10 @@ function fromActivityRow(row) {
     leaderName: row.leader_name || "",
     leaderPhone: row.leader_phone || "",
     leaderEmail: row.leader_email || "",
-    ward: row.default_ward || ""
+    ward: row.default_ward || "",
+    defaultValues: row.default_values || {},
+    pdfTemplatePath: row.pdf_template_path || "",
+    pdfTemplateUrl: row.pdf_template_url || ""
   };
 }
 
@@ -248,6 +276,11 @@ function renderActivities() {
     .map((activity) => `<option value="${activity.id}">${escapeHtml(activity.name)}</option>`)
     .join("");
 
+  elements.activityFilter.innerHTML = [
+    `<option value="">All activities</option>`,
+    ...state.activities.map((activity) => `<option value="${activity.id}">${escapeHtml(activity.name)}</option>`)
+  ].join("");
+
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("activity");
   if (requested) {
@@ -256,16 +289,23 @@ function renderActivities() {
   }
 
   applySelectedActivity();
+  renderActivityCards();
 }
 
 function applySelectedActivity() {
   const activity = getSelectedActivity();
   elements.activityTitle.textContent = activity.name;
-  elements.pdfDownload.href = config.pdfTemplateUrl;
+  const pdfUrl = getActivityPdfUrl(activity);
+  elements.pdfDownload.href = pdfUrl;
   renderPdfPreview();
 
-  const wardInput = elements.submissionForm.elements.ward;
-  if (wardInput && !wardInput.value && activity.ward) wardInput.value = activity.ward;
+  const defaults = getActivityDefaults(activity);
+  for (const [name, value] of Object.entries(defaults)) {
+    const input = elements.submissionForm.elements[name];
+    if (input && !input.value && value !== undefined && value !== null) {
+      input.value = String(value);
+    }
+  }
 }
 
 async function renderPdfPreview() {
@@ -278,7 +318,7 @@ async function renderPdfPreview() {
 
   elements.pdfViewer.innerHTML = `<p class="pdf-message">Rendering PDF preview...</p>`;
   try {
-    const pdf = await window.pdfjsLib.getDocument(config.pdfTemplateUrl).promise;
+    const pdf = await window.pdfjsLib.getDocument(getActivityPdfUrl(getSelectedActivity())).promise;
     elements.pdfViewer.innerHTML = "";
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
@@ -334,7 +374,7 @@ function escapeHtml(value) {
 }
 
 async function generatePdf(values) {
-  const bytes = await fetch(config.pdfTemplateUrl).then((response) => response.arrayBuffer());
+  const bytes = await fetch(getActivityPdfUrl(getSelectedActivity())).then((response) => response.arrayBuffer());
   const pdfDoc = await pdfLib.PDFDocument.load(bytes);
   const form = pdfDoc.getForm();
 
@@ -346,8 +386,12 @@ async function generatePdf(values) {
     try {
       if (textKey && field.constructor.name === "PDFTextField") {
         field.setText(String(values[textKey] || ""));
+      } else if (!textKey && field.constructor.name === "PDFTextField" && values[name] !== undefined) {
+        field.setText(String(values[name] || ""));
       } else if (checkboxKey && field.constructor.name === "PDFCheckBox") {
         values[checkboxKey] ? field.check() : field.uncheck();
+      } else if (!checkboxKey && field.constructor.name === "PDFCheckBox" && values[name] !== undefined) {
+        values[name] ? field.check() : field.uncheck();
       }
     } catch (error) {
       console.warn(`Could not fill field ${name}`, error);
@@ -513,6 +557,7 @@ function setupSignaturePad() {
 
 function renderAdmin() {
   const query = elements.submissionSearch.value.trim().toLowerCase();
+  const selectedActivityId = elements.activityFilter.value;
   const submissions = state.submissions.filter((submission) => {
     const haystack = [
       submission.youthName,
@@ -521,7 +566,9 @@ function renderAdmin() {
       submission.ward,
       submission.activityName
     ].join(" ").toLowerCase();
-    return !query || haystack.includes(query);
+    const matchesQuery = !query || haystack.includes(query);
+    const matchesActivity = !selectedActivityId || submission.activityId === selectedActivityId;
+    return matchesQuery && matchesActivity;
   });
 
   const uniqueYouth = new Set(submissions.map((submission) => submission.youthName?.toLowerCase()).filter(Boolean));
@@ -550,46 +597,118 @@ function renderAdmin() {
       </tr>
     `).join("")
     : `<tr><td colspan="6">No submissions yet.</td></tr>`;
+
+  renderActivityCards();
+}
+
+function renderActivityCards() {
+  if (!elements.activityCards) return;
+  const counts = state.submissions.reduce((acc, submission) => {
+    const key = submission.activityId || submission.activityName;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  elements.activityCards.innerHTML = state.activities.map((activity) => {
+    const pdfUrl = getActivityPdfUrl(activity);
+    const defaultCount = Object.keys(activity.defaultValues || {}).filter((key) => activity.defaultValues[key]).length;
+    const submissionCount = counts[activity.id] || counts[activity.name] || 0;
+    return `
+      <article class="activity-card">
+        <h3>${escapeHtml(activity.name)}</h3>
+        <div class="activity-meta">
+          <span>${escapeHtml(activity.dates || "No dates set")}</span>
+          <span>${escapeHtml(activity.ward || "No default ward")} · ${defaultCount} preset fields</span>
+          <span>${submissionCount} submission${submissionCount === 1 ? "" : "s"}</span>
+        </div>
+        <div class="actions">
+          <button class="secondary edit-activity" data-id="${escapeHtml(activity.id)}" type="button">Edit</button>
+          <a class="link-button" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Open PDF</a>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 async function saveActivity(form) {
   const data = Object.fromEntries(new FormData(form).entries());
+  const existing = state.activities.find((item) => item.id === data.id);
+  const advancedDefaults = parseDefaultValues(data.defaultValuesJson);
+  const defaultValues = {
+    ...(existing?.defaultValues || {}),
+    ...advancedDefaults,
+    city: String(data.defaultCity || advancedDefaults.city || "").trim(),
+    state: String(data.defaultState || advancedDefaults.state || "").trim()
+  };
+  Object.keys(defaultValues).forEach((key) => {
+    if (defaultValues[key] === "" || defaultValues[key] === null || defaultValues[key] === undefined) {
+      delete defaultValues[key];
+    }
+  });
+
   const activity = {
-    id: createId("act"),
+    id: data.id || createId("act"),
     slug: slugify(data.slug || data.name),
     name: String(data.name || "").trim(),
-    event: String(data.name || "").trim(),
+    event: String(data.event || data.name || "").trim(),
     dates: String(data.dates || "").trim(),
     description: String(data.description || "").trim(),
     stake: String(data.stake || "").trim(),
     leaderName: String(data.leaderName || "").trim(),
     leaderPhone: String(data.leaderPhone || "").trim(),
     leaderEmail: String(data.leaderEmail || "").trim(),
-    ward: ""
+    ward: String(data.ward || "").trim(),
+    defaultValues,
+    pdfTemplatePath: existing?.pdfTemplatePath || "",
+    pdfTemplateUrl: String(data.pdfTemplateUrl || existing?.pdfTemplateUrl || "").trim()
   };
 
   if (!runtime.canBootSupabase) {
-    state.activities.unshift(activity);
+    const file = form.elements.pdfFile.files?.[0];
+    if (file) {
+      activity.pdfTemplateUrl = URL.createObjectURL(file);
+    }
+    state.activities = [activity, ...state.activities.filter((item) => item.id !== activity.id)];
     saveLocalState();
     renderActivities();
     return;
   }
 
   const client = getClient();
+  const file = form.elements.pdfFile.files?.[0];
+  if (file) {
+    const filePath = `${activity.slug}/${Date.now()}-${slugify(file.name).replace(/-pdf$/, "")}.pdf`;
+    const { error: uploadError } = await client.storage
+      .from(getTemplateBucket())
+      .upload(filePath, file, { contentType: "application/pdf", upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = client.storage.from(getTemplateBucket()).getPublicUrl(filePath);
+    activity.pdfTemplatePath = filePath;
+    activity.pdfTemplateUrl = publicUrlData.publicUrl;
+  }
+
+  const payload = {
+    slug: activity.slug,
+    name: activity.name,
+    event_name: activity.event,
+    event_dates: activity.dates,
+    event_description: activity.description,
+    stake: activity.stake,
+    leader_name: activity.leaderName,
+    leader_phone: activity.leaderPhone,
+    leader_email: activity.leaderEmail,
+    default_ward: activity.ward,
+    default_values: activity.defaultValues,
+    pdf_template_path: activity.pdfTemplatePath || null,
+    pdf_template_url: activity.pdfTemplateUrl || null,
+    is_active: true
+  };
+  if (activity.id && !activity.id.startsWith("act_")) payload.id = activity.id;
+
   const { data: row, error } = await client
     .from("permission_activities")
-    .upsert({
-      slug: activity.slug,
-      name: activity.name,
-      event_name: activity.event,
-      event_dates: activity.dates,
-      event_description: activity.description,
-      stake: activity.stake,
-      leader_name: activity.leaderName,
-      leader_phone: activity.leaderPhone,
-      leader_email: activity.leaderEmail,
-      is_active: true
-    }, { onConflict: "slug" })
+    .upsert(payload, { onConflict: "slug" })
     .select("*")
     .single();
 
@@ -597,6 +716,48 @@ async function saveActivity(form) {
   const saved = fromActivityRow(row);
   state.activities = [saved, ...state.activities.filter((item) => item.id !== saved.id && item.slug !== saved.slug)];
   renderActivities();
+}
+
+function parseDefaultValues(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return {};
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      throw new Error("Default values must be a JSON object.");
+    }
+    return parsed;
+  } catch (error) {
+    throw new Error(`Default values JSON is invalid: ${error.message}`);
+  }
+}
+
+function editActivity(activityId) {
+  const activity = state.activities.find((item) => item.id === activityId);
+  if (!activity) return;
+  const form = elements.activityForm;
+  form.elements.id.value = activity.id;
+  form.elements.name.value = activity.name || "";
+  form.elements.slug.value = activity.slug || "";
+  form.elements.event.value = activity.event || activity.name || "";
+  form.elements.dates.value = activity.dates || "";
+  form.elements.stake.value = activity.stake || "";
+  form.elements.ward.value = activity.ward || "";
+  form.elements.defaultCity.value = activity.defaultValues?.city || "";
+  form.elements.defaultState.value = activity.defaultValues?.state || "";
+  form.elements.leaderName.value = activity.leaderName || "";
+  form.elements.leaderPhone.value = activity.leaderPhone || "";
+  form.elements.leaderEmail.value = activity.leaderEmail || "";
+  form.elements.description.value = activity.description || "";
+  form.elements.pdfTemplateUrl.value = activity.pdfTemplateUrl || "";
+  form.elements.defaultValuesJson.value = JSON.stringify(activity.defaultValues || {}, null, 2);
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function resetActivityForm() {
+  elements.activityForm.reset();
+  elements.activityForm.elements.id.value = "";
+  elements.activityForm.elements.defaultValuesJson.value = "";
 }
 
 async function signInAdmin(form) {
@@ -687,16 +848,20 @@ function bindEvents() {
     event.preventDefault();
     try {
       await saveActivity(elements.activityForm);
-      elements.activityForm.reset();
+      resetActivityForm();
       setStatus(elements.adminStatus, "Activity saved. Public links use ?activity=activity-slug.", "success");
     } catch (error) {
       setStatus(elements.adminStatus, error.message || "Unable to save activity.", "error");
     }
   });
 
+  elements.newActivity.addEventListener("click", resetActivityForm);
+
   elements.refreshAdmin.addEventListener("click", async () => {
     try {
+      await loadActivities();
       await loadAdminSubmissions();
+      renderActivities();
       renderAdmin();
       setStatus(elements.adminStatus, "Dashboard refreshed.", "success");
     } catch (error) {
@@ -705,6 +870,12 @@ function bindEvents() {
   });
 
   elements.submissionSearch.addEventListener("input", renderAdmin);
+  elements.activityFilter.addEventListener("change", renderAdmin);
+
+  elements.activityCards.addEventListener("click", (event) => {
+    const button = event.target.closest(".edit-activity");
+    if (button) editActivity(button.dataset.id);
+  });
 
   elements.submissionRows.addEventListener("click", async (event) => {
     const button = event.target.closest(".open-pdf");

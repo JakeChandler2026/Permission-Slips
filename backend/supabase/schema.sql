@@ -18,6 +18,9 @@ create table if not exists public.permission_activities (
   leader_phone text,
   leader_email text,
   default_ward text,
+  default_values jsonb not null default '{}'::jsonb,
+  pdf_template_path text,
+  pdf_template_url text,
   starts_on date,
   is_active boolean not null default true,
   created_by uuid references auth.users(id) on delete set null,
@@ -144,6 +147,10 @@ insert into storage.buckets (id, name, public)
 values ('permission-slip-submissions', 'permission-slip-submissions', false)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('permission-slip-templates', 'permission-slip-templates', true)
+on conflict (id) do nothing;
+
 drop policy if exists "permission_slip_public_upload" on storage.objects;
 create policy "permission_slip_public_upload"
 on storage.objects
@@ -165,6 +172,28 @@ for update
 to authenticated
 using (bucket_id = 'permission-slip-submissions' and public.current_permission_admin())
 with check (bucket_id = 'permission-slip-submissions' and public.current_permission_admin());
+
+drop policy if exists "permission_template_public_read" on storage.objects;
+create policy "permission_template_public_read"
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'permission-slip-templates');
+
+drop policy if exists "permission_template_admin_upload" on storage.objects;
+create policy "permission_template_admin_upload"
+on storage.objects
+for insert
+to authenticated
+with check (bucket_id = 'permission-slip-templates' and public.current_permission_admin());
+
+drop policy if exists "permission_template_admin_update" on storage.objects;
+create policy "permission_template_admin_update"
+on storage.objects
+for update
+to authenticated
+using (bucket_id = 'permission-slip-templates' and public.current_permission_admin())
+with check (bucket_id = 'permission-slip-templates' and public.current_permission_admin());
 
 insert into public.permission_activities (
   slug,

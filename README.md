@@ -10,6 +10,19 @@ Static Vercel-friendly app for reusable church activity paperwork.
 - Stores submissions locally in demo mode, or in Supabase storage and tables in production.
 - Gives admins a dashboard for submissions by youth, activity, ward, parent, and signed PDF.
 - Lets admins create reusable activity defaults. Public links can use `?activity=2026-trek`.
+- Lets admins upload a different PDF packet for each activity.
+- Tracks all submissions across all uploaded permission slips in one admin view.
+
+## Admin Workflow
+
+1. Sign in on the Admin tab with a Supabase Auth user whose email is listed in `permission_admins`.
+2. Create or edit an activity in Activity setup.
+3. Upload the packet PDF for that activity, or paste an existing PDF URL.
+4. Fill the default event fields and optional advanced default JSON.
+5. Save the activity.
+6. Share the public URL with `?activity=your-activity-slug`.
+
+Default JSON keys can match form field names such as `ward`, `city`, `state`, `emergencyContact`, or even raw PDF field names for custom packets.
 
 ## Supabase setup
 
