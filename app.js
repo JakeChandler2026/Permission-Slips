@@ -92,6 +92,8 @@ const elements = {
   formStatus: document.getElementById("formStatus"),
   previewPdf: document.getElementById("previewPdf"),
   signaturePad: document.getElementById("signaturePad"),
+  signatureName: document.getElementById("signatureName"),
+  adoptSignature: document.getElementById("adoptSignature"),
   clearSignature: document.getElementById("clearSignature"),
   adminLogin: document.getElementById("adminLogin"),
   adminSignOut: document.getElementById("adminSignOut"),
@@ -111,6 +113,7 @@ const state = {
   submissions: [],
   adminSession: null,
   signatureTouched: false,
+  signatureAdopted: false,
   drawing: false
 };
 
@@ -360,9 +363,11 @@ function collectFormData() {
     activityId: activity.id,
     activityName: activity.name,
     submittedName: values.participantName,
+    signerName: values.signatureName || values.parentName || values.participantName,
+    signatureMethod: state.signatureAdopted ? "adopted" : "drawn",
     today: todayString(),
     initials,
-    signatureText: `Electronically signed by ${values.parentName || values.participantName || "participant"} on ${todayString()}`
+    signatureText: `Electronically signed by ${values.signatureName || values.parentName || values.participantName || "participant"} on ${todayString()}`
   };
 }
 
@@ -391,6 +396,62 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function signatureHasInk() {
+  const canvas = elements.signaturePad;
+  const ctx = canvas.getContext("2d");
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let markedPixels = 0;
+
+  for (let index = 3; index < pixels.length; index += 4) {
+    if (pixels[index] > 12) {
+      markedPixels += 1;
+      if (markedPixels > 80) return true;
+    }
+  }
+
+  return false;
+}
+
+function getSignatureName() {
+  return String(
+    elements.signatureName.value ||
+    elements.submissionForm.elements.parentName.value ||
+    elements.submissionForm.elements.participantName.value ||
+    ""
+  ).trim();
+}
+
+function adoptSignature() {
+  const name = getSignatureName();
+  if (!name) {
+    setStatus(elements.formStatus, "Type the signer name before adopting a signature.", "error");
+    elements.signatureName.focus();
+    return;
+  }
+
+  elements.signatureName.value = name;
+  const canvas = elements.signaturePad;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.fillStyle = "#1f2930";
+  ctx.strokeStyle = "rgba(31, 41, 48, 0.22)";
+  ctx.lineWidth = 1.5;
+  ctx.font = '64px "Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive';
+  ctx.textBaseline = "middle";
+  ctx.translate(58, canvas.height / 2 + 4);
+  ctx.rotate(-0.025);
+  ctx.fillText(name, 0, 0, canvas.width - 110);
+  ctx.beginPath();
+  ctx.moveTo(4, 48);
+  ctx.bezierCurveTo(canvas.width * 0.25, 68, canvas.width * 0.55, 58, canvas.width - 120, 66);
+  ctx.stroke();
+  ctx.restore();
+  state.signatureTouched = true;
+  state.signatureAdopted = true;
+  setStatus(elements.formStatus, "Signature adopted. You can clear it and draw instead.", "success");
+}
+
 async function generatePdf(values) {
   const bytes = await fetch(getActivityPdfUrl(getSelectedActivity())).then((response) => response.arrayBuffer());
   const pdfDoc = await pdfLib.PDFDocument.load(bytes);
@@ -416,7 +477,7 @@ async function generatePdf(values) {
     }
   }
 
-  if (state.signatureTouched) {
+  if (signatureHasInk()) {
     await drawSignatureImages(pdfDoc, form);
   }
 
@@ -432,20 +493,38 @@ async function drawSignatureImages(pdfDoc, form) {
     "Participants signature",
     "Parent or guardians signature if participant is a minor"
   ];
+  let placements = 0;
 
   for (const fieldName of signatureFields) {
-    const field = form.getTextField(fieldName);
-    const widget = field.acroField.getWidgets()[0];
-    const rect = widget.getRectangle();
-    const pageRef = widget.P();
-    const page = pdfDoc.getPages().find((candidate) => candidate.ref === pageRef) || pdfDoc.getPages()[0];
-    const width = Math.min(rect.width || 180, 230);
-    const height = Math.min(rect.height || 38, 48);
+    try {
+      const field = form.getTextField(fieldName);
+      const widget = field.acroField.getWidgets()[0];
+      const rect = widget.getRectangle();
+      const pageRef = widget.P();
+      const page = pdfDoc.getPages().find((candidate) => candidate.ref === pageRef) || pdfDoc.getPages()[0];
+      const width = Math.min(rect.width || 180, 230);
+      const height = Math.min(rect.height || 38, 48);
+      page.drawImage(png, {
+        x: rect.x,
+        y: rect.y - 2,
+        width,
+        height
+      });
+      placements += 1;
+    } catch {
+      // Uploaded packets may not use the original Trek signature field names.
+    }
+  }
+
+  if (!placements) {
+    const pages = pdfDoc.getPages();
+    const page = pages[pages.length - 1];
+    const { width } = page.getSize();
     page.drawImage(png, {
-      x: rect.x,
-      y: rect.y - 2,
-      width,
-      height
+      x: 72,
+      y: 72,
+      width: Math.min(260, width - 144),
+      height: 72
     });
   }
 }
@@ -546,6 +625,7 @@ function setupSignaturePad() {
     event.preventDefault();
     state.drawing = true;
     state.signatureTouched = true;
+    state.signatureAdopted = false;
     const p = point(event);
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
@@ -574,7 +654,10 @@ function setupSignaturePad() {
   elements.clearSignature.addEventListener("click", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     state.signatureTouched = false;
+    state.signatureAdopted = false;
   });
+
+  elements.adoptSignature.addEventListener("click", adoptSignature);
 }
 
 function renderAdmin() {
@@ -824,6 +907,10 @@ function bindEvents() {
 
   elements.previewPdf.addEventListener("click", async () => {
     try {
+      if (!signatureHasInk()) {
+        setStatus(elements.formStatus, "Please draw or adopt a signature before previewing the signed PDF.", "error");
+        return;
+      }
       setStatus(elements.formStatus, "Building preview PDF...");
       const values = collectFormData();
       const bytes = await generatePdf(values);
@@ -836,8 +923,8 @@ function bindEvents() {
 
   elements.submissionForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!state.signatureTouched) {
-      setStatus(elements.formStatus, "Please sign before submitting.", "error");
+    if (!signatureHasInk()) {
+      setStatus(elements.formStatus, "Please draw or adopt a signature before submitting.", "error");
       return;
     }
 

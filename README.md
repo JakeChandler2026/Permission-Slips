@@ -7,6 +7,7 @@ Static Vercel-friendly app for reusable church activity paperwork.
 - Shows the original PDF packet in the browser.
 - Lets a parent/guardian fill youth, contact, medical, and consent fields.
 - Captures a drawn signature and generates a flattened signed PDF.
+- Requires a signature before preview/submission and supports adopting a script-style typed signature.
 - Stores submissions locally in demo mode, or in Supabase storage and tables in production.
 - Gives admins a dashboard for submissions by youth, activity, ward, parent, and signed PDF.
 - Lets admins create reusable activity defaults. Public links can use `?activity=2026-trek`.
