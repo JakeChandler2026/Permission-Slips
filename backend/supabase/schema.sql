@@ -32,12 +32,14 @@ create table if not exists public.permission_submissions (
   id uuid primary key default gen_random_uuid(),
   activity_id uuid references public.permission_activities(id) on delete set null,
   activity_name text not null,
+  submitted_name text,
   youth_name text not null,
   youth_birth_date date,
   parent_name text not null,
   parent_email text not null,
   parent_phone text,
   ward text,
+  submitter_ip text,
   pdf_path text not null,
   form_data jsonb not null default '{}'::jsonb,
   submitted_at timestamptz not null default now()
@@ -45,6 +47,7 @@ create table if not exists public.permission_submissions (
 
 create index if not exists idx_permission_activities_slug on public.permission_activities(slug);
 create index if not exists idx_permission_submissions_activity on public.permission_submissions(activity_id, submitted_at desc);
+create index if not exists idx_permission_submissions_submitted_name on public.permission_submissions(lower(submitted_name));
 create index if not exists idx_permission_submissions_youth on public.permission_submissions(lower(youth_name));
 
 create or replace function public.permission_set_updated_at()

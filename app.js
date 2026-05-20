@@ -254,10 +254,12 @@ function fromSubmissionRow(row) {
     id: row.id,
     activityId: row.activity_id,
     activityName: row.activity?.name || row.activity_name || "",
+    submittedName: row.submitted_name || row.youth_name,
     youthName: row.youth_name,
     parentName: row.parent_name,
     parentEmail: row.parent_email,
     ward: row.ward,
+    submitterIp: row.submitter_ip || row.form_data?.submitterIp || "",
     submittedAt: row.submitted_at,
     pdfPath: row.pdf_path,
     pdfUrl: row.pdf_url || "",
@@ -357,10 +359,26 @@ function collectFormData() {
     ...values,
     activityId: activity.id,
     activityName: activity.name,
+    submittedName: values.participantName,
     today: todayString(),
     initials,
     signatureText: `Electronically signed by ${values.parentName || values.participantName || "participant"} on ${todayString()}`
   };
+}
+
+async function fetchPublicIpAddress() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch("https://api.ipify.org?format=json", { signal: controller.signal });
+    if (!response.ok) return "";
+    const data = await response.json();
+    return String(data.ip || "").trim();
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function escapeHtml(value) {
@@ -449,10 +467,12 @@ async function submitToBackend(values, pdfBytes) {
       id: createId("sub"),
       activityId: values.activityId,
       activityName: values.activityName,
+      submittedName: values.submittedName || values.participantName,
       youthName: values.participantName,
       parentName: values.parentName,
       parentEmail: values.parentEmail,
       ward: values.ward,
+      submitterIp: values.submitterIp || "",
       submittedAt: new Date().toISOString(),
       pdfUrl: blobInfo.url,
       pdfPath: fileName,
@@ -477,12 +497,14 @@ async function submitToBackend(values, pdfBytes) {
     .insert({
       activity_id: activity.id === "default-activity" ? null : activity.id,
       activity_name: activity.name,
+      submitted_name: values.submittedName || values.participantName,
       youth_name: values.participantName,
       youth_birth_date: values.dateOfBirth || null,
       parent_name: values.parentName,
       parent_email: values.parentEmail,
       parent_phone: values.primaryPhone,
       ward: values.ward,
+      submitter_ip: values.submitterIp || null,
       pdf_path: path,
       form_data: values
     })
@@ -564,7 +586,9 @@ function renderAdmin() {
       submission.parentName,
       submission.parentEmail,
       submission.ward,
-      submission.activityName
+      submission.activityName,
+      submission.submittedName,
+      submission.submitterIp
     ].join(" ").toLowerCase();
     const matchesQuery = !query || haystack.includes(query);
     const matchesActivity = !selectedActivityId || submission.activityId === selectedActivityId;
@@ -588,10 +612,11 @@ function renderAdmin() {
   elements.submissionRows.innerHTML = submissions.length
     ? submissions.map((submission) => `
       <tr>
-        <td>${escapeHtml(submission.youthName)}</td>
+        <td>${escapeHtml(submission.submittedName || submission.youthName)}</td>
         <td>${escapeHtml(submission.activityName)}</td>
         <td>${escapeHtml(submission.ward)}</td>
         <td>${escapeHtml(submission.parentName)}<br><span>${escapeHtml(submission.parentEmail)}</span></td>
+        <td>${escapeHtml(submission.submitterIp || "Not captured")}</td>
         <td>${escapeHtml(new Date(submission.submittedAt).toLocaleString())}</td>
         <td><button class="secondary open-pdf" data-id="${escapeHtml(submission.id)}" type="button">Open</button></td>
       </tr>
@@ -819,6 +844,7 @@ function bindEvents() {
     try {
       setStatus(elements.formStatus, "Creating signed PDF and submitting...");
       const values = collectFormData();
+      values.submitterIp = await fetchPublicIpAddress();
       const pdfBytes = await generatePdf(values);
       const submission = await submitToBackend(values, pdfBytes);
       state.submissions = [submission, ...state.submissions.filter((item) => item.id !== submission.id)];
