@@ -579,12 +579,24 @@ async function submitToBackend(values, pdfBytes) {
       submitter_ip: values.submitterIp || null,
       pdf_path: path,
       form_data: values
-    })
-    .select("*, activity:permission_activities(name, slug)")
-    .single();
+    });
 
   if (error) throw error;
-  return fromSubmissionRow(data);
+  return {
+    id: data?.[0]?.id || createId("sub"),
+    activityId: activity.id === "default-activity" ? null : activity.id,
+    activityName: activity.name,
+    submittedName: values.submittedName || values.participantName,
+    youthName: values.participantName,
+    parentName: values.parentName,
+    parentEmail: values.parentEmail,
+    ward: values.ward,
+    submitterIp: values.submitterIp || "",
+    submittedAt: new Date().toISOString(),
+    pdfPath: path,
+    pdfUrl: "",
+    data: values
+  };
 }
 
 async function getPdfUrl(submission) {
