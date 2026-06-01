@@ -3,8 +3,8 @@ window.PermissionSlipConfig = {
   projectName: "Activity Permission Slips",
   pdfTemplateUrl: "assets/2026-trek-paperwork-packet.pdf",
   supabase: {
-    url: "https://yxvwrlixsudrdfshaidi.supabase.co",
-    anonKey: "sb_publishable_6aYU1Zu_NunMtBYmTDvS3A_DdPtnJ4z",
+    url: "https://sfdqctljsozhnsokevgh.supabase.co",
+    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmZHFjdGxqc296aG5zb2tldmdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyODM5NjIsImV4cCI6MjA5NDg1OTk2Mn0.Qgtk3LRyjeRu2-IDUCPFIWrQEhw7_s9aV7ps5xP_h-w",
     submissionsBucket: "permission-slip-submissions",
     templatesBucket: "permission-slip-templates"
   },
