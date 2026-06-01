@@ -29,15 +29,15 @@ Default JSON keys can match form field names such as `ward`, `city`, `state`, `e
 
 This repo is linked to the separate `Permission Slips` Supabase project:
 
-- Project ref: `sfdqctljsozhnsokevgh`
-- API URL: `https://sfdqctljsozhnsokevgh.supabase.co`
+- Project ref: `yxvwrlixsudrdfshaidi`
+- API URL: `https://yxvwrlixsudrdfshaidi.supabase.co`
 
 The local migration has already been pushed once with the Supabase CLI. Future GitHub-based migration pushes use `.github/workflows/supabase-migrations.yml`.
 
 1. Add these GitHub repository secrets:
    - `SUPABASE_ACCESS_TOKEN`
    - `SUPABASE_DB_PASSWORD`
-   - `SUPABASE_PROJECT_ID` set to `sfdqctljsozhnsokevgh`
+   - `SUPABASE_PROJECT_ID` set to `yxvwrlixsudrdfshaidi`
 2. Run the `Supabase Migrations` workflow from GitHub Actions, or push changes under `supabase/**` to `main`.
 3. If applying manually instead, run `npx supabase db push` from this repo.
 4. Add at least one admin email:
