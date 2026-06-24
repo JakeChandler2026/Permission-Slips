@@ -88,6 +88,7 @@ const elements = {
   submissionForm: document.getElementById("submissionForm"),
   activitySelect: document.getElementById("activitySelect"),
   activityTitle: document.getElementById("activityTitle"),
+  dynamicFields: document.getElementById("dynamicFields"),
   pdfViewer: document.getElementById("pdfViewer"),
   pdfDownload: document.getElementById("pdfDownload"),
   formStatus: document.getElementById("formStatus"),
@@ -113,11 +114,51 @@ const state = {
   activities: [],
   submissions: [],
   adminSession: null,
+  fieldRenderId: 0,
+  pdfFields: [],
+  pdfFieldCache: new Map(),
   previewRenderId: 0,
   signatureTouched: false,
   signatureAdopted: false,
   drawing: false
 };
+
+const adminFilledFieldNames = new Set([
+  "Event",
+  "Dates of event",
+  "Event description",
+  "Stake",
+  "Event or activity leader",
+  "Event or activity leaders phone number",
+  "Event or activity leaders email",
+  "Ward"
+]);
+
+const signatureFieldNames = new Set([
+  "Participants signature",
+  "Parent or guardians signature if participant is a minor",
+  "Date",
+  "Date_2",
+  "Date (P/G signed)",
+  "Date (participant signged)",
+  "Btn.Reset"
+]);
+
+const requiredFamilyKeys = new Set([
+  "participantName",
+  "dateOfBirth",
+  "parentName",
+  "primaryPhone",
+  "parentEmail"
+]);
+
+const supplementalFamilyFields = [
+  { key: "participantName", label: "Participant name", group: "Youth", inputType: "text" },
+  { key: "dateOfBirth", label: "Date of birth", group: "Youth", inputType: "date" },
+  { key: "parentName", label: "Parent/guardian name", group: "Parent or guardian", inputType: "text" },
+  { key: "primaryPhone", label: "Primary phone", group: "Parent or guardian", inputType: "tel" },
+  { key: "parentEmail", label: "Email", group: "Parent or guardian", inputType: "email" }
+];
 
 function todayString() {
   return new Date().toLocaleDateString(undefined, { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -198,6 +239,187 @@ function isTextField(field) {
 
 function isCheckBox(field) {
   return typeof field.check === "function" && typeof field.uncheck === "function";
+}
+
+function getFieldKey(name, isCheckbox = false) {
+  return isCheckbox ? (checkboxMap[name] || name) : (fieldMap[name] || name);
+}
+
+function getFieldLabel(name) {
+  return String(name || "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\bphone 1\b/i, "phone")
+    .trim();
+}
+
+function getInputType(key, label) {
+  const haystack = `${key} ${label}`.toLowerCase();
+  if (haystack.includes("email")) return "email";
+  if (haystack.includes("phone") || haystack.includes("cell") || haystack.includes("telephone")) return "tel";
+  if (haystack.includes("birth") || key === "dateOfBirth") return "date";
+  return "text";
+}
+
+function shouldUseTextarea(key, label) {
+  return /medication|medicine|explanation|explain|restriction|allerg|special|limitation|illness|need/i
+    .test(`${key} ${label}`);
+}
+
+function getAutocomplete(key) {
+  return {
+    participantName: "name",
+    parentName: "name",
+    phone: "tel",
+    primaryPhone: "tel",
+    secondaryPhone: "tel",
+    parentEmail: "email",
+    address: "street-address",
+    city: "address-level2",
+    state: "address-level1"
+  }[key] || "";
+}
+
+function getFieldGroup(field) {
+  const key = field.key;
+  if (["participantName", "dateOfBirth", "age", "gender", "phone", "address", "city", "state", "ward"].includes(key)) {
+    return "Youth";
+  }
+  if (["parentName", "parentEmail", "primaryPhone", "secondaryPhone", "fatherName", "fatherCell", "motherName", "motherCell"].includes(key)) {
+    return "Parent or guardian";
+  }
+  if (["emergencyContact", "emergencyPhone", "insuranceCompany", "policyNumber", "physicianName", "physicianPhone"].includes(key)) {
+    return "Emergency and medical contacts";
+  }
+  if ([
+    "specialDiet",
+    "dietExplanation",
+    "allergies",
+    "allergyExplanation",
+    "medications",
+    "selfAdmin",
+    "surgery",
+    "surgeryExplanation",
+    "chronicIllness",
+    "illnessExplanation",
+    "specialNeeds",
+    "otherLimitations",
+    "asthma",
+    "diabetes",
+    "epilepsy",
+    "heartTrouble",
+    "highBp",
+    "acetaminophen",
+    "antacid",
+    "ibuprofen",
+    "diphenhydramine",
+    "otherMedicine",
+    "otherMedicineList"
+  ].includes(key)) {
+    return "Medical details";
+  }
+  return "Additional information";
+}
+
+function sortPdfFields(fields) {
+  const order = ["Youth", "Parent or guardian", "Emergency and medical contacts", "Medical details", "Additional information"];
+  return [...fields].sort((a, b) => {
+    const groupDiff = order.indexOf(a.group) - order.indexOf(b.group);
+    return groupDiff || a.index - b.index;
+  });
+}
+
+async function getPdfFieldDefinitions(activity) {
+  const pdfUrl = getActivityPdfUrl(activity);
+  if (state.pdfFieldCache.has(pdfUrl)) return state.pdfFieldCache.get(pdfUrl);
+
+  const bytes = await fetch(pdfUrl).then((response) => response.arrayBuffer());
+  const pdfDoc = await pdfLib.PDFDocument.load(bytes);
+  const seen = new Set();
+  const definitions = [];
+
+  pdfDoc.getForm().getFields().forEach((field, index) => {
+    const name = field.getName();
+    if (adminFilledFieldNames.has(name) || signatureFieldNames.has(name)) return;
+
+    const checkbox = isCheckBox(field);
+    const text = isTextField(field);
+    if (!checkbox && !text) return;
+
+    const key = getFieldKey(name, checkbox);
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const label = getFieldLabel(name);
+    const definition = {
+      index,
+      name,
+      key,
+      label,
+      type: checkbox ? "checkbox" : "text",
+      inputType: checkbox ? "checkbox" : getInputType(key, label),
+      textarea: !checkbox && shouldUseTextarea(key, label),
+      required: requiredFamilyKeys.has(key)
+    };
+    definition.group = getFieldGroup(definition);
+    definitions.push(definition);
+  });
+
+  for (const field of supplementalFamilyFields) {
+    if (seen.has(field.key)) continue;
+    seen.add(field.key);
+    definitions.push({
+      index: 10_000 + definitions.length,
+      name: field.key,
+      key: field.key,
+      label: field.label,
+      group: field.group,
+      type: "text",
+      inputType: field.inputType,
+      textarea: false,
+      required: requiredFamilyKeys.has(field.key)
+    });
+  }
+
+  const sorted = sortPdfFields(definitions);
+  state.pdfFieldCache.set(pdfUrl, sorted);
+  return sorted;
+}
+
+function renderField(definition) {
+  const required = definition.required ? " required" : "";
+  const autocomplete = getAutocomplete(definition.key);
+  const autocompleteAttr = autocomplete ? ` autocomplete="${escapeHtml(autocomplete)}"` : "";
+
+  if (definition.type === "checkbox") {
+    return `<label><input type="checkbox" name="${escapeHtml(definition.key)}"> ${escapeHtml(definition.label)}</label>`;
+  }
+
+  if (definition.textarea) {
+    return `<label>${escapeHtml(definition.label)}<textarea name="${escapeHtml(definition.key)}"${required}></textarea></label>`;
+  }
+
+  return `<label>${escapeHtml(definition.label)}<input name="${escapeHtml(definition.key)}" type="${escapeHtml(definition.inputType)}"${required}${autocompleteAttr}></label>`;
+}
+
+function renderDynamicFieldGroups(fields) {
+  const groups = fields.reduce((acc, field) => {
+    acc[field.group] ||= [];
+    acc[field.group].push(field);
+    return acc;
+  }, {});
+
+  elements.dynamicFields.innerHTML = Object.entries(groups).map(([group, groupFields]) => {
+    const checkboxes = groupFields.filter((field) => field.type === "checkbox");
+    const textFields = groupFields.filter((field) => field.type !== "checkbox");
+    return `
+      <fieldset>
+        <legend>${escapeHtml(group)}</legend>
+        ${checkboxes.length ? `<div class="check-grid">${checkboxes.map(renderField).join("")}</div>` : ""}
+        ${textFields.length ? `<div class="grid two">${textFields.map(renderField).join("")}</div>` : ""}
+      </fieldset>
+    `;
+  }).join("");
 }
 
 function fillPdfFields(form, values) {
@@ -326,20 +548,43 @@ function renderActivities() {
   renderActivityCards();
 }
 
+async function renderDynamicFamilyFields(activity) {
+  if (!elements.dynamicFields) return;
+  const renderId = ++state.fieldRenderId;
+  elements.dynamicFields.innerHTML = `<p class="pdf-message">Loading form fields...</p>`;
+
+  try {
+    const fields = await getPdfFieldDefinitions(activity);
+    if (renderId !== state.fieldRenderId) return;
+    state.pdfFields = fields;
+    renderDynamicFieldGroups(fields);
+    applyActivityDefaults(activity);
+  } catch (error) {
+    if (renderId !== state.fieldRenderId) return;
+    state.pdfFields = [];
+    elements.dynamicFields.innerHTML = `<p class="pdf-message">Unable to inspect this PDF. You can still open the packet preview on the right.</p>`;
+  }
+}
+
+function applyActivityDefaults(activity) {
+  const defaults = getActivityDefaults(activity);
+  for (const [name, value] of Object.entries(defaults)) {
+    const input = elements.submissionForm.elements[name];
+    if (input?.type === "checkbox") {
+      input.checked = Boolean(value);
+    } else if (input && !input.value && value !== undefined && value !== null) {
+      input.value = String(value);
+    }
+  }
+}
+
 function applySelectedActivity() {
   const activity = getSelectedActivity();
   elements.activityTitle.textContent = activity.name;
   const pdfUrl = getActivityPdfUrl(activity);
   elements.pdfDownload.href = pdfUrl;
+  renderDynamicFamilyFields(activity);
   renderPdfPreview();
-
-  const defaults = getActivityDefaults(activity);
-  for (const [name, value] of Object.entries(defaults)) {
-    const input = elements.submissionForm.elements[name];
-    if (input && !input.value && value !== undefined && value !== null) {
-      input.value = String(value);
-    }
-  }
 }
 
 function getActivityPreviewValues(activity) {
@@ -404,6 +649,9 @@ function collectFormData() {
 
   for (const key of Object.values(checkboxMap)) {
     values[key] = elements.submissionForm.elements[key]?.checked || false;
+  }
+  for (const field of state.pdfFields.filter((item) => item.type === "checkbox")) {
+    values[field.key] = elements.submissionForm.elements[field.key]?.checked || false;
   }
 
   const activity = getSelectedActivity();

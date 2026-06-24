@@ -30,57 +30,9 @@
             <select id="activitySelect" aria-label="Activity"></select>
           </div>
 
-          <fieldset>
-            <legend>Youth</legend>
-            <div class="grid two">
-              <label>Participant name<input name="participantName" required autocomplete="name"></label>
-              <label>Date of birth<input name="dateOfBirth" type="date" required></label>
-              <label>Age<input name="age" inputmode="numeric"></label>
-              <label>Phone<input name="phone" type="tel" autocomplete="tel"></label>
-              <label>Ward<input name="ward"></label>
-            </div>
-            <label>Address<input name="address" autocomplete="street-address"></label>
-            <div class="grid two">
-              <label>City<input name="city" autocomplete="address-level2"></label>
-              <label>State<input name="state" autocomplete="address-level1"></label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Parent or guardian</legend>
-            <div class="grid two">
-              <label>Parent/guardian name<input name="parentName" required autocomplete="name"></label>
-              <label>Primary phone<input name="primaryPhone" type="tel" required autocomplete="tel"></label>
-              <label>Secondary phone<input name="secondaryPhone" type="tel"></label>
-              <label>Email<input name="parentEmail" type="email" required autocomplete="email"></label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Emergency contact</legend>
-            <div class="grid two">
-              <label>Emergency contact<input name="emergencyContact" required></label>
-              <label>Emergency contact phone<input name="emergencyPhone" type="tel" required></label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Medical details</legend>
-            <div class="check-grid">
-              <label><input type="checkbox" name="specialDiet"> Special diet</label>
-              <label><input type="checkbox" name="allergies"> Allergies</label>
-              <label><input type="checkbox" name="selfAdmin"> Self-administers medication</label>
-              <label><input type="checkbox" name="surgery"> Recent surgery</label>
-              <label><input type="checkbox" name="chronicIllness"> Chronic illness</label>
-            </div>
-            <label>Diet explanation<textarea name="dietExplanation"></textarea></label>
-            <label>Allergy explanation<textarea name="allergyExplanation"></textarea></label>
-            <label>Medications<textarea name="medications"></textarea></label>
-            <label>Surgery explanation<textarea name="surgeryExplanation"></textarea></label>
-            <label>Chronic illness explanation<textarea name="illnessExplanation"></textarea></label>
-            <label>Special needs<textarea name="specialNeeds"></textarea></label>
-            <label>Other limitations<textarea name="otherLimitations"></textarea></label>
-          </fieldset>
+          <div id="dynamicFields">
+            <p class="pdf-message">Loading form fields...</p>
+          </div>
 
           <fieldset>
             <legend>Signature</legend>
