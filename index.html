@@ -36,7 +36,6 @@
               <label>Participant name<input name="participantName" required autocomplete="name"></label>
               <label>Date of birth<input name="dateOfBirth" type="date" required></label>
               <label>Age<input name="age" inputmode="numeric"></label>
-              <label>Gender<input name="gender" placeholder="M/F or preferred"></label>
               <label>Phone<input name="phone" type="tel" autocomplete="tel"></label>
               <label>Ward<input name="ward"></label>
             </div>
@@ -54,22 +53,14 @@
               <label>Primary phone<input name="primaryPhone" type="tel" required autocomplete="tel"></label>
               <label>Secondary phone<input name="secondaryPhone" type="tel"></label>
               <label>Email<input name="parentEmail" type="email" required autocomplete="email"></label>
-              <label>Father/guardian<input name="fatherName"></label>
-              <label>Father cell<input name="fatherCell" type="tel"></label>
-              <label>Mother/guardian<input name="motherName"></label>
-              <label>Mother cell<input name="motherCell" type="tel"></label>
             </div>
           </fieldset>
 
           <fieldset>
-            <legend>Emergency and insurance</legend>
+            <legend>Emergency contact</legend>
             <div class="grid two">
               <label>Emergency contact<input name="emergencyContact" required></label>
               <label>Emergency contact phone<input name="emergencyPhone" type="tel" required></label>
-              <label>Health insurance company<input name="insuranceCompany"></label>
-              <label>Policy number<input name="policyNumber"></label>
-              <label>Physician name<input name="physicianName"></label>
-              <label>Physician phone<input name="physicianPhone" type="tel"></label>
             </div>
           </fieldset>
 
@@ -81,28 +72,14 @@
               <label><input type="checkbox" name="selfAdmin"> Self-administers medication</label>
               <label><input type="checkbox" name="surgery"> Recent surgery</label>
               <label><input type="checkbox" name="chronicIllness"> Chronic illness</label>
-              <label><input type="checkbox" name="asthma"> Asthma</label>
-              <label><input type="checkbox" name="diabetes"> Diabetes</label>
-              <label><input type="checkbox" name="epilepsy"> Epilepsy</label>
-              <label><input type="checkbox" name="heartTrouble"> Heart trouble</label>
-              <label><input type="checkbox" name="highBp"> High BP</label>
             </div>
             <label>Diet explanation<textarea name="dietExplanation"></textarea></label>
             <label>Allergy explanation<textarea name="allergyExplanation"></textarea></label>
             <label>Medications<textarea name="medications"></textarea></label>
-            <label>Special needs or limitations<textarea name="specialNeeds"></textarea></label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Medicine permissions</legend>
-            <div class="check-grid">
-              <label><input type="checkbox" name="acetaminophen"> Acetaminophen</label>
-              <label><input type="checkbox" name="antacid"> Antacid</label>
-              <label><input type="checkbox" name="ibuprofen"> Ibuprofen</label>
-              <label><input type="checkbox" name="diphenhydramine"> Diphenhydramine</label>
-              <label><input type="checkbox" name="otherMedicine"> Other medicine</label>
-            </div>
-            <label>Other medicine list<input name="otherMedicineList"></label>
+            <label>Surgery explanation<textarea name="surgeryExplanation"></textarea></label>
+            <label>Chronic illness explanation<textarea name="illnessExplanation"></textarea></label>
+            <label>Special needs<textarea name="specialNeeds"></textarea></label>
+            <label>Other limitations<textarea name="otherLimitations"></textarea></label>
           </fieldset>
 
           <fieldset>
