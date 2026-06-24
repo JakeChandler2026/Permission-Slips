@@ -189,6 +189,14 @@ function getActivityDefaults(activity) {
   };
 }
 
+function isTextField(field) {
+  return typeof field.setText === "function";
+}
+
+function isCheckBox(field) {
+  return typeof field.check === "function" && typeof field.uncheck === "function";
+}
+
 async function loadActivities() {
   const fallbackActivities = [{ id: "default-activity", ...config.defaultActivity }];
   if (!runtime.canBootSupabase) {
@@ -456,13 +464,13 @@ async function generatePdf(values) {
     const checkboxKey = checkboxMap[name];
 
     try {
-      if (textKey && field.constructor.name === "PDFTextField") {
+      if (textKey && isTextField(field)) {
         field.setText(String(values[textKey] || ""));
-      } else if (!textKey && field.constructor.name === "PDFTextField" && values[name] !== undefined) {
+      } else if (!textKey && isTextField(field) && values[name] !== undefined) {
         field.setText(String(values[name] || ""));
-      } else if (checkboxKey && field.constructor.name === "PDFCheckBox") {
+      } else if (checkboxKey && isCheckBox(field)) {
         values[checkboxKey] ? field.check() : field.uncheck();
-      } else if (!checkboxKey && field.constructor.name === "PDFCheckBox" && values[name] !== undefined) {
+      } else if (!checkboxKey && isCheckBox(field) && values[name] !== undefined) {
         values[name] ? field.check() : field.uncheck();
       }
     } catch (error) {
