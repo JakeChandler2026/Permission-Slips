@@ -111,6 +111,7 @@ const state = {
   activities: [],
   submissions: [],
   adminSession: null,
+  previewRenderId: 0,
   signatureTouched: false,
   signatureAdopted: false,
   drawing: false
@@ -197,6 +198,28 @@ function isCheckBox(field) {
   return typeof field.check === "function" && typeof field.uncheck === "function";
 }
 
+function fillPdfFields(form, values) {
+  for (const field of form.getFields()) {
+    const name = field.getName();
+    const textKey = fieldMap[name];
+    const checkboxKey = checkboxMap[name];
+
+    try {
+      if (textKey && isTextField(field)) {
+        field.setText(String(values[textKey] || ""));
+      } else if (!textKey && isTextField(field) && values[name] !== undefined) {
+        field.setText(String(values[name] || ""));
+      } else if (checkboxKey && isCheckBox(field)) {
+        values[checkboxKey] ? field.check() : field.uncheck();
+      } else if (!checkboxKey && isCheckBox(field) && values[name] !== undefined) {
+        values[name] ? field.check() : field.uncheck();
+      }
+    } catch (error) {
+      console.warn(`Could not fill field ${name}`, error);
+    }
+  }
+}
+
 async function loadActivities() {
   const fallbackActivities = [{ id: "default-activity", ...config.defaultActivity }];
   if (!runtime.canBootSupabase) {
@@ -211,7 +234,8 @@ async function loadActivities() {
     .from("permission_activities")
     .select("*")
     .eq("is_active", true)
-    .order("starts_on", { ascending: false, nullsFirst: false });
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     state.activities = fallbackActivities;
@@ -255,7 +279,9 @@ function fromActivityRow(row) {
     ward: row.default_ward || "",
     defaultValues: row.default_values || {},
     pdfTemplatePath: row.pdf_template_path || "",
-    pdfTemplateUrl: row.pdf_template_url || ""
+    pdfTemplateUrl: row.pdf_template_url || "",
+    createdAt: row.created_at || "",
+    updatedAt: row.updated_at || ""
   };
 }
 
@@ -314,6 +340,26 @@ function applySelectedActivity() {
   }
 }
 
+function getActivityPreviewValues(activity) {
+  return {
+    ...activity,
+    ...getActivityDefaults(activity),
+    activityId: activity.id,
+    activityName: activity.name,
+    today: todayString()
+  };
+}
+
+async function generatePrefilledPdfPreview(activity) {
+  const bytes = await fetch(getActivityPdfUrl(activity)).then((response) => response.arrayBuffer());
+  const pdfDoc = await pdfLib.PDFDocument.load(bytes);
+  const form = pdfDoc.getForm();
+  fillPdfFields(form, getActivityPreviewValues(activity));
+  form.updateFieldAppearances();
+  form.flatten();
+  return pdfDoc.save();
+}
+
 async function renderPdfPreview() {
   if (!elements.pdfViewer) return;
   if (!window.pdfjsLib) {
@@ -323,11 +369,16 @@ async function renderPdfPreview() {
   }
 
   elements.pdfViewer.innerHTML = `<p class="pdf-message">Rendering PDF preview...</p>`;
+  const renderId = ++state.previewRenderId;
   try {
-    const pdf = await window.pdfjsLib.getDocument(getActivityPdfUrl(getSelectedActivity())).promise;
+    const activity = getSelectedActivity();
+    const bytes = await generatePrefilledPdfPreview(activity);
+    const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
+    if (renderId !== state.previewRenderId) return;
     elements.pdfViewer.innerHTML = "";
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
+      if (renderId !== state.previewRenderId) return;
       const viewport = page.getViewport({ scale: 1.35 });
       const canvas = document.createElement("canvas");
       canvas.width = Math.floor(viewport.width);
@@ -458,25 +509,7 @@ async function generatePdf(values) {
   const pdfDoc = await pdfLib.PDFDocument.load(bytes);
   const form = pdfDoc.getForm();
 
-  for (const field of form.getFields()) {
-    const name = field.getName();
-    const textKey = fieldMap[name];
-    const checkboxKey = checkboxMap[name];
-
-    try {
-      if (textKey && isTextField(field)) {
-        field.setText(String(values[textKey] || ""));
-      } else if (!textKey && isTextField(field) && values[name] !== undefined) {
-        field.setText(String(values[name] || ""));
-      } else if (checkboxKey && isCheckBox(field)) {
-        values[checkboxKey] ? field.check() : field.uncheck();
-      } else if (!checkboxKey && isCheckBox(field) && values[name] !== undefined) {
-        values[name] ? field.check() : field.uncheck();
-      }
-    } catch (error) {
-      console.warn(`Could not fill field ${name}`, error);
-    }
-  }
+  fillPdfFields(form, values);
 
   if (signatureHasInk()) {
     await drawSignatureImages(pdfDoc, form);
