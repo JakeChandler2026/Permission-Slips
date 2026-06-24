@@ -14,6 +14,7 @@
     </div>
     <nav class="tabs" aria-label="Primary">
       <button class="tab active" data-view="familyView" type="button">Family form</button>
+      <button class="tab" data-view="editorView" type="button">PDF editor</button>
       <button class="tab" data-view="adminView" type="button">Admin</button>
     </nav>
   </header>
@@ -63,6 +64,49 @@
             <a id="pdfDownload" class="link-button" href="assets/parental-or-guardian-permission-medical-release.pdf" target="_blank" rel="noreferrer">Open PDF</a>
           </div>
           <div id="pdfViewer" class="pdf-viewer" aria-label="Activity paperwork PDF preview"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="editorView" class="view">
+      <div class="editor-shell">
+        <form id="editorTools" class="panel editor-tools">
+          <p class="eyebrow">PDF Editor</p>
+          <h2>Beneficiary PDF</h2>
+          <label>Open PDF<input id="editorPdfFile" type="file" accept="application/pdf"></label>
+          <div class="actions">
+            <button id="loadSamplePdf" class="secondary" type="button">Load sample</button>
+            <button id="exportEditedPdf" type="button">Export PDF</button>
+          </div>
+
+          <fieldset>
+            <legend>Tool</legend>
+            <div class="editor-tool-grid">
+              <label><input type="radio" name="editorTool" value="text" checked> Text</label>
+              <label><input type="radio" name="editorTool" value="check"> Checkmark</label>
+              <label><input type="radio" name="editorTool" value="signature"> Signature</label>
+            </div>
+          </fieldset>
+
+          <label>Text<input id="editorTextValue" value="Type text here"></label>
+          <label>Font size<input id="editorFontSize" type="number" min="8" max="48" value="14"></label>
+          <p id="editorStatus" class="form-status" role="status"></p>
+        </form>
+
+        <section class="panel editor-workspace">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Canvas</p>
+              <h2>Click the PDF to place fields</h2>
+            </div>
+          </div>
+          <div id="editorPages" class="editor-pages"></div>
+        </section>
+
+        <aside class="panel editor-list-panel">
+          <p class="eyebrow">Placed Items</p>
+          <h2>Objects</h2>
+          <div id="editorObjectList" class="editor-object-list"></div>
         </aside>
       </div>
     </section>

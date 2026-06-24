@@ -107,13 +107,30 @@ const elements = {
   activityFilter: document.getElementById("activityFilter"),
   refreshAdmin: document.getElementById("refreshAdmin"),
   summaryCards: document.getElementById("summaryCards"),
-  submissionRows: document.getElementById("submissionRows")
+  submissionRows: document.getElementById("submissionRows"),
+  editorTools: document.getElementById("editorTools"),
+  editorPdfFile: document.getElementById("editorPdfFile"),
+  loadSamplePdf: document.getElementById("loadSamplePdf"),
+  exportEditedPdf: document.getElementById("exportEditedPdf"),
+  editorPages: document.getElementById("editorPages"),
+  editorTextValue: document.getElementById("editorTextValue"),
+  editorFontSize: document.getElementById("editorFontSize"),
+  editorStatus: document.getElementById("editorStatus"),
+  editorObjectList: document.getElementById("editorObjectList")
 };
 
 const state = {
   activities: [],
   submissions: [],
   adminSession: null,
+  editor: {
+    annotations: [],
+    bytes: null,
+    filename: "edited-document.pdf",
+    pdf: null,
+    renderScale: 1.35,
+    selectedId: null
+  },
   fieldRenderId: 0,
   pdfFields: [],
   pdfFieldCache: new Map(),
@@ -901,6 +918,183 @@ async function getPdfUrl(submission) {
   return data.signedUrl;
 }
 
+function getEditorTool() {
+  return new FormData(elements.editorTools).get("editorTool") || "text";
+}
+
+function setEditorStatus(message, kind = "") {
+  if (elements.editorStatus) setStatus(elements.editorStatus, message, kind);
+}
+
+async function loadEditorPdfFromBytes(bytes, filename) {
+  if (!window.pdfjsLib) {
+    setEditorStatus("PDF tools are still loading. Try again in a moment.", "error");
+    return;
+  }
+
+  state.editor.bytes = bytes;
+  state.editor.filename = filename || "edited-document.pdf";
+  state.editor.annotations = [];
+  state.editor.selectedId = null;
+  state.editor.pdf = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+  await renderEditorPages();
+  renderEditorObjectList();
+  setEditorStatus(`Loaded ${state.editor.pdf.numPages} page PDF.`, "success");
+}
+
+async function loadEditorSample() {
+  const response = await fetch("assets/beneficiaries-sample.pdf");
+  if (!response.ok) throw new Error("Unable to load the sample PDF.");
+  await loadEditorPdfFromBytes(new Uint8Array(await response.arrayBuffer()), "beneficiaries-edited.pdf");
+}
+
+async function renderEditorPages() {
+  elements.editorPages.innerHTML = "";
+  if (!state.editor.pdf) {
+    elements.editorPages.innerHTML = `<p class="pdf-message">Load a PDF to begin editing.</p>`;
+    return;
+  }
+
+  for (let pageNumber = 1; pageNumber <= state.editor.pdf.numPages; pageNumber += 1) {
+    const page = await state.editor.pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: state.editor.renderScale });
+    const pageWrap = document.createElement("div");
+    pageWrap.className = "editor-page";
+    pageWrap.dataset.page = String(pageNumber);
+    pageWrap.style.width = `${Math.floor(viewport.width)}px`;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    pageWrap.appendChild(canvas);
+    elements.editorPages.appendChild(pageWrap);
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+  }
+
+  renderEditorAnnotations();
+}
+
+function createEditorAnnotation(pageWrap, event) {
+  const tool = getEditorTool();
+  const rect = pageWrap.getBoundingClientRect();
+  const xRatio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  const yRatio = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+  const fontSize = Number(elements.editorFontSize.value || 14);
+  const text = tool === "check" ? "✓" : String(elements.editorTextValue.value || "").trim();
+  const signatureText = String(elements.editorTextValue.value || "Signature").trim();
+  const annotation = {
+    id: createId("pdfitem"),
+    page: Number(pageWrap.dataset.page),
+    type: tool,
+    text: tool === "signature" ? signatureText : text,
+    xRatio,
+    yRatio,
+    fontSize: tool === "signature" ? Math.max(fontSize + 8, 22) : fontSize
+  };
+
+  if (!annotation.text) {
+    setEditorStatus("Enter text before placing it on the PDF.", "error");
+    return;
+  }
+
+  state.editor.annotations.push(annotation);
+  state.editor.selectedId = annotation.id;
+  renderEditorAnnotations();
+  renderEditorObjectList();
+  setEditorStatus("Item placed. Drag it to adjust.", "success");
+}
+
+function renderEditorAnnotations() {
+  elements.editorPages.querySelectorAll(".editor-overlay").forEach((item) => item.remove());
+
+  for (const annotation of state.editor.annotations) {
+    const pageWrap = elements.editorPages.querySelector(`.editor-page[data-page="${annotation.page}"]`);
+    if (!pageWrap) continue;
+
+    const overlay = document.createElement("div");
+    overlay.className = `editor-overlay ${annotation.type}`;
+    overlay.classList.toggle("selected", annotation.id === state.editor.selectedId);
+    overlay.dataset.id = annotation.id;
+    overlay.style.left = `${annotation.xRatio * 100}%`;
+    overlay.style.top = `${annotation.yRatio * 100}%`;
+    overlay.style.fontSize = `${annotation.fontSize}px`;
+    overlay.textContent = annotation.text;
+    pageWrap.appendChild(overlay);
+  }
+}
+
+function renderEditorObjectList() {
+  if (!elements.editorObjectList) return;
+  elements.editorObjectList.innerHTML = state.editor.annotations.length
+    ? state.editor.annotations.map((annotation, index) => `
+      <div class="editor-object">
+        <span>Page ${annotation.page}: ${escapeHtml(annotation.text || annotation.type)}</span>
+        <button class="ghost remove-editor-object" data-id="${escapeHtml(annotation.id)}" type="button">Remove</button>
+      </div>
+    `).join("")
+    : `<p class="pdf-message">No items placed yet.</p>`;
+}
+
+function startEditorDrag(overlay, event) {
+  const annotation = state.editor.annotations.find((item) => item.id === overlay.dataset.id);
+  const pageWrap = overlay.closest(".editor-page");
+  if (!annotation || !pageWrap) return;
+
+  state.editor.selectedId = annotation.id;
+  renderEditorAnnotations();
+  const activeOverlay = elements.editorPages.querySelector(`.editor-overlay[data-id="${annotation.id}"]`) || overlay;
+  activeOverlay.setPointerCapture?.(event.pointerId);
+
+  const move = (moveEvent) => {
+    const rect = pageWrap.getBoundingClientRect();
+    annotation.xRatio = Math.max(0, Math.min(1, (moveEvent.clientX - rect.left) / rect.width));
+    annotation.yRatio = Math.max(0, Math.min(1, (moveEvent.clientY - rect.top) / rect.height));
+    activeOverlay.style.left = `${annotation.xRatio * 100}%`;
+    activeOverlay.style.top = `${annotation.yRatio * 100}%`;
+  };
+
+  const stop = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", stop);
+  };
+
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", stop);
+}
+
+async function exportEditedPdf() {
+  if (!state.editor.bytes) {
+    setEditorStatus("Load a PDF before exporting.", "error");
+    return;
+  }
+
+  const pdfDoc = await pdfLib.PDFDocument.load(state.editor.bytes.slice(0));
+  const regularFont = await pdfDoc.embedFont(pdfLib.StandardFonts.Helvetica);
+  const signatureFont = await pdfDoc.embedFont(pdfLib.StandardFonts.TimesRomanItalic);
+
+  for (const annotation of state.editor.annotations) {
+    const page = pdfDoc.getPages()[annotation.page - 1];
+    if (!page) continue;
+    const { width, height } = page.getSize();
+    const x = annotation.xRatio * width;
+    const y = height - (annotation.yRatio * height);
+    const font = annotation.type === "signature" ? signatureFont : regularFont;
+    const text = annotation.type === "check" ? "X" : annotation.text;
+    page.drawText(text, {
+      x,
+      y: y - annotation.fontSize / 2,
+      size: annotation.fontSize,
+      font,
+      color: pdfLib.rgb(0.08, 0.11, 0.14),
+      maxWidth: width - x - 24
+    });
+  }
+
+  const editedBytes = await pdfDoc.save();
+  downloadBytes(editedBytes, state.editor.filename.replace(/\.pdf$/i, "") + "-edited.pdf");
+  setEditorStatus("Edited PDF exported.", "success");
+}
+
 function setupSignaturePad() {
   const canvas = elements.signaturePad;
   const ctx = canvas.getContext("2d");
@@ -1298,11 +1492,62 @@ function bindEvents() {
       setStatus(elements.adminStatus, error.message || "Unable to open PDF.", "error");
     }
   });
+
+  elements.loadSamplePdf?.addEventListener("click", async () => {
+    try {
+      setEditorStatus("Loading sample PDF...");
+      await loadEditorSample();
+    } catch (error) {
+      setEditorStatus(error.message || "Unable to load sample PDF.", "error");
+    }
+  });
+
+  elements.editorPdfFile?.addEventListener("change", async () => {
+    const file = elements.editorPdfFile.files?.[0];
+    if (!file) return;
+    try {
+      setEditorStatus("Loading PDF...");
+      await loadEditorPdfFromBytes(new Uint8Array(await file.arrayBuffer()), file.name);
+    } catch (error) {
+      setEditorStatus(error.message || "Unable to load PDF.", "error");
+    }
+  });
+
+  elements.editorPages?.addEventListener("click", (event) => {
+    if (event.target.closest(".editor-overlay")) return;
+    const pageWrap = event.target.closest(".editor-page");
+    if (pageWrap) createEditorAnnotation(pageWrap, event);
+  });
+
+  elements.editorPages?.addEventListener("pointerdown", (event) => {
+    const overlay = event.target.closest(".editor-overlay");
+    if (overlay) startEditorDrag(overlay, event);
+  });
+
+  elements.editorObjectList?.addEventListener("click", (event) => {
+    const button = event.target.closest(".remove-editor-object");
+    if (!button) return;
+    state.editor.annotations = state.editor.annotations.filter((item) => item.id !== button.dataset.id);
+    if (state.editor.selectedId === button.dataset.id) state.editor.selectedId = null;
+    renderEditorAnnotations();
+    renderEditorObjectList();
+  });
+
+  elements.exportEditedPdf?.addEventListener("click", async () => {
+    try {
+      await exportEditedPdf();
+    } catch (error) {
+      setEditorStatus(error.message || "Unable to export PDF.", "error");
+    }
+  });
 }
 
 async function init() {
   setupSignaturePad();
   bindEvents();
+  if (elements.editorPages) {
+    elements.editorPages.innerHTML = `<p class="pdf-message">Load a PDF or use the sample to begin editing.</p>`;
+  }
 
   try {
     await loadActivities();

@@ -265,6 +265,118 @@ button.ghost {
   font-weight: 650;
 }
 
+.editor-shell {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(480px, 1.35fr) minmax(240px, 0.45fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.editor-tools,
+.editor-list-panel {
+  position: sticky;
+  top: 16px;
+}
+
+.editor-tool-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-tool-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-tool-grid input {
+  width: auto;
+}
+
+.editor-workspace {
+  min-height: calc(100vh - 120px);
+}
+
+.editor-pages {
+  display: grid;
+  gap: 18px;
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #eef2f3;
+}
+
+.editor-page {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(28, 38, 43, 0.16);
+}
+
+.editor-page canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 3px;
+}
+
+.editor-overlay {
+  position: absolute;
+  transform: translate(-2px, -50%);
+  min-width: 18px;
+  min-height: 18px;
+  padding: 2px 4px;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  color: #111827;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: move;
+  user-select: none;
+  white-space: pre;
+}
+
+.editor-overlay:hover,
+.editor-overlay.selected {
+  border-color: var(--blue);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.editor-overlay.check,
+.editor-overlay.signature {
+  font-weight: 800;
+}
+
+.editor-overlay.signature {
+  font-family: "Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive;
+}
+
+.editor-object-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.editor-object {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  background: #fbfcfc;
+  font-size: 0.88rem;
+}
+
+.editor-object button {
+  padding: 6px 8px;
+}
+
 .admin-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.7fr) minmax(420px, 1.3fr);
@@ -354,8 +466,9 @@ th {
 
 @media (max-width: 980px) {
   .topbar, .section-title { align-items: stretch; flex-direction: column; }
-  .split, .admin-grid { grid-template-columns: 1fr; }
+  .split, .admin-grid, .editor-shell { grid-template-columns: 1fr; }
   .pdf-panel { position: static; height: auto; }
+  .editor-tools, .editor-list-panel { position: static; }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
